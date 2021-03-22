@@ -139,7 +139,6 @@ class ImageGPTConfig:
     # training
     total_steps = 100000
     warmup_steps = 500
-    batch_size = 2
     learning_rate = 0.0001
     weight_decay = 0.1
     betas = [0.9, 0.95]

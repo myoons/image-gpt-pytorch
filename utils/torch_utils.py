@@ -1,6 +1,12 @@
+import os
 import math
 import torch
+import logging
+import platform
 from torch.optim.lr_scheduler import LambdaLR
+
+
+logger = logging.getLogger(__name__)
 
 
 def set_optimizer(config, model):
@@ -62,3 +68,29 @@ def learning_rate_schedule(warmup_steps, total_steps):
             return 0.5 * (1.0 + math.cos(math.pi * progress))
 
     return learning_rate_fn
+
+
+def select_device(args, batch_size=None):
+    s = f'Image-GPT-PyTorch 🚀 '
+    cpu = args.device.lower() == 'cpu'
+    if cpu:
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    elif args.device:
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.device  # set environment variable
+        assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {args.device} requested'
+
+    cuda = not cpu and torch.cuda.is_available()
+    if cuda:
+        n = torch.cuda.device_count()
+        if n > 1 and batch_size:  # check that batch_size is compatible with device_count
+            assert batch_size % n == 0, f'batch-size {batch_size} not multiple of GPU count {n}'
+        space = ' ' * len(s)
+        for i, d in enumerate(args.device.split(',') if args.device else range(n)):
+            p = torch.cuda.get_device_properties(i)
+            s += f"{'' if i == 0 else space}CUDA:{d} ({p.name}, {p.total_memory / 1024 ** 2}MB)\n"
+    else:
+        s += 'CPU\n'
+
+    if args.local_rank in [-1, 0]:
+        print(s.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else s)
+    return torch.device('cuda:0' if cuda else 'cpu')
